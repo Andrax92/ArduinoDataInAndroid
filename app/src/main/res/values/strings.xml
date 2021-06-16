@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">My Application</string>
+    <string name="type_1">Start</string>
+    <string name="type_2">Falling</string>
+    <string name="type_3">Stop</string>
+    <string name="dummy_content">DUMMY CONTENT</string>
+</resources>
