@@ -63,8 +63,10 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
 
         // Check permissions for writing data files in external storage
         if (!isPermissionGranted(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-            ActivityCompat.requestPermissions(this, STORAGE_PERMISSIONS, REQUEST_STORAGE_PERMISSION)
+            ActivityCompat.requestPermissions(this,
+                STORAGE_PERMISSIONS, REQUEST_STORAGE_PERMISSION)
         } else {
+            // If permission already granted, create a file
             createFile(false)
         }
 
@@ -83,6 +85,7 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
             filePrefix = FALL_FILE_PREFIX
         }
 
+        // Check if we have the permissions to create files in external storage
         if (isExternalStorageAvailable() && !isExternalStorageReadOnly()) {
             path = Environment.getExternalStorageDirectory().path
 
@@ -111,6 +114,7 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        // Unregister listeners and services to prevent crashes
         if (!comesFromStop) {
             unregisterReceiver(mUsbReceiver)
             unbindService(usbConnection)
@@ -124,8 +128,12 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
             startService(UsbService::class.java, usbConnection, null)
             createFile(recordFalling)
         }
-        sensorManager.registerListener(this, accelSensor, SensorManager.SENSOR_DELAY_NORMAL)
-        sensorManager.registerListener(this, gyroSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        // Register Android sensors listeners
+        sensorManager.registerListener(this,
+            accelSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        sensorManager.registerListener(this,
+            gyroSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        // Send start command to Arduino
         val start = "s"
         usbService.write(start.toByteArray())
         display("\nRECORDING DATA\n")
@@ -148,12 +156,14 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
     }
 
     fun stopReadingData(view: View) {
+        // Send stop command to Arduino
         val stop = "t"
         usbService.write(stop.toByteArray())
         stopReading()
     }
 
     private fun stopReading() {
+        // Unregister listeners and notify user
         Toast.makeText(this, "Stopping data retrieval", Toast.LENGTH_LONG).show()
         if (mUsbReceiver.isOrderedBroadcast) {
             unregisterReceiver(mUsbReceiver)
@@ -173,17 +183,24 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
+        // Monitor sensor changes and convert to string values
         val sensorName: String = event?.sensor!!.name
         if (sensorName.contains("Gravity")) {
-            accelArray[0] = decFormat.format(event.values[0] / 9.8).toString().replace(",", ".")
-            accelArray[1] = decFormat.format(event.values[1] / 9.8).toString().replace(",", ".")
-            accelArray[2] = decFormat.format(event.values[2] / 9.8).toString().replace(",", ".")
+            accelArray[0] = decFormat.format(event.values[0] / 9.8)
+                .toString().replace(",", ".")
+            accelArray[1] = decFormat.format(event.values[1] / 9.8)
+                .toString().replace(",", ".")
+            accelArray[2] = decFormat.format(event.values[2] / 9.8)
+                .toString().replace(",", ".")
             Log.d(LOG_TAG, "AccelValues: $accelArray")
         }
         if (sensorName.contains("Gyroscope")) {
-            gyroArray[0] = decFormat.format(event.values[0]).toString().replace(",", ".")
-            gyroArray[1] = decFormat.format(event.values[1]).toString().replace(",", ".")
-            gyroArray[2] = decFormat.format(event.values[2]).toString().replace(",", ".")
+            gyroArray[0] = decFormat.format(event.values[0])
+                .toString().replace(",", ".")
+            gyroArray[1] = decFormat.format(event.values[1])
+                .toString().replace(",", ".")
+            gyroArray[2] = decFormat.format(event.values[2])
+                .toString().replace(",", ".")
             Log.d(LOG_TAG, "GyroValues: $gyroArray")
         }
     }
@@ -193,11 +210,15 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun display(message: String) {
+        // Show on UI textView
         runOnUiThread {
             binding.tvContent.append(message)
         }
     }
 
+    /*
+    * Start USB service
+    */
     private fun startService(service: Class<*>, serviceConnection: ServiceConnection, extras: Bundle?) {
         if (!UsbService.SERVICE_CONNECTED) {
             val startService = Intent(this, service)
@@ -214,6 +235,9 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
         bindService(bindingIntent, serviceConnection, BIND_AUTO_CREATE)
     }
 
+    /*
+    * Set filters and register the USB receiver
+    */
     private fun setFilters() {
         val filter = IntentFilter()
         filter.addAction(UsbService.ACTION_USB_PERMISSION_GRANTED)
@@ -235,7 +259,8 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun isPermissionGranted(callerActivity: Activity?, permission: String?): Boolean {
-        return ContextCompat.checkSelfPermission(callerActivity!!, permission!!) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat
+            .checkSelfPermission(callerActivity!!, permission!!) == PackageManager.PERMISSION_GRANTED
     }
 
 
@@ -271,7 +296,8 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
     }
 
     /*
-     * This handler will be passed to UsbService. Data received from serial port is displayed through this handler
+     * This handler will be passed to UsbService.
+     * Data received from serial port is displayed through this handler
      */
     private class MessageHandler(activity: ArduinoDataActivity) : Handler(Looper.getMainLooper()) {
 
@@ -281,10 +307,12 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
 
         override fun handleMessage(msg: Message) {
             when (msg.what) {
+                // Process serial port message
                 UsbService.MESSAGE_FROM_SERIAL_PORT -> {
                     val data = msg.obj as String
                     val completeData = concatenateMessage(data.trim())
                     try {
+                        // Add new data to the existing data in the file
                         File(mActivity.file.absolutePath).appendText(completeData)
                     } catch (e: IOException) {
                         Log.e("Error", "Error writing data \n$e")
@@ -298,17 +326,11 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
             }
         }
 
-        fun getAccelArray() {
-
-        }
-
+        // Concatenate Arduino data (data) with Android sensor data
         private fun concatenateMessage(data: String): String {
-            var appendedData = "$data,${accelerationValues[0]},${accelerationValues[1]},${accelerationValues[2]},${gyroscopeValues[0]},${gyroscopeValues[1]},${gyroscopeValues[2]}\n"
-            val splitData = appendedData.split(",")
-            if (splitData.size < 10) {
-                appendedData = "$data,${mActivity.accelArray[0]},${mActivity.accelArray[1]},${mActivity.accelArray[2]},${mActivity.gyroArray[0]},${mActivity.gyroArray[1]},${mActivity.gyroArray[2]}\n"
-            }
-            return appendedData
+            return "$data," +
+                    "${accelerationValues[0]},${accelerationValues[1]},${accelerationValues[2]}," +
+                    "${gyroscopeValues[0]},${gyroscopeValues[1]},${gyroscopeValues[2]}\n"
         }
     }
 
