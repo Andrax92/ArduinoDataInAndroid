@@ -45,6 +45,9 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var path: String
     private lateinit var file: File
 
+    lateinit var mainHandler: Handler
+    private var startTimeMillis: Long = 0
+
     private var comesFromStop: Boolean = false
     private var recordFalling: Boolean = false
 
@@ -69,6 +72,8 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
             // If permission already granted, create a file
             createFile(false)
         }
+
+        mainHandler = Handler(Looper.getMainLooper())
 
         // Set accelerometer and gyroscope sensors
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
@@ -120,6 +125,7 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
             unbindService(usbConnection)
             sensorManager.unregisterListener(this)
         }
+        mainHandler.removeCallbacks(writeToFileTask)
     }
 
     fun startReadingArduinoData(view: View) {
@@ -134,8 +140,10 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
         sensorManager.registerListener(this,
             gyroSensor, SensorManager.SENSOR_DELAY_NORMAL)
         // Send start command to Arduino
-        val start = "s"
-        usbService.write(start.toByteArray())
+        /*val start = "s"
+        usbService.write(start.toByteArray())*/
+        mainHandler.post(writeToFileTask)
+        startTimeMillis = System.currentTimeMillis()
         display("\nRECORDING DATA\n")
     }
 
@@ -157,8 +165,8 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
 
     fun stopReadingData(view: View) {
         // Send stop command to Arduino
-        val stop = "t"
-        usbService.write(stop.toByteArray())
+        /*val stop = "t"
+        usbService.write(stop.toByteArray())*/
         stopReading()
     }
 
@@ -171,6 +179,7 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
             sensorManager.unregisterListener(this)
         }
         comesFromStop = true
+        mainHandler.removeCallbacks(writeToFileTask)
         display("\nDATA RETRIEVAL STOPPED\n")
     }
 
@@ -179,6 +188,17 @@ class ArduinoDataActivity : AppCompatActivity(), SensorEventListener {
             File(file.absolutePath).appendText(data)
         } catch (e: IOException) {
             Log.e("Error", "Error writing data \n$e")
+        }
+    }
+
+    private val writeToFileTask = object : Runnable {
+        override fun run() {
+            val elapsedTime = System.currentTimeMillis() - startTimeMillis
+            val data = "$elapsedTime," + "${accelArray[0]},${accelArray[1]},${accelArray[2]}," +
+                    "${gyroArray[0]},${gyroArray[1]},${gyroArray[2]}\n"
+            Log.d(LOG_TAG, data)
+            write(data)
+            mainHandler.postDelayed(this, 1000)
         }
     }
 
